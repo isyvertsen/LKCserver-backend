@@ -19,7 +19,15 @@ async def get_current_user_optional(
     db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise return None."""
-    # Development bypass - with additional security checks
+    user_service = UserService(db)
+
+    # First check if credentials are provided - always honor explicit auth
+    if credentials:
+        user_id = verify_token(credentials.credentials)
+        if user_id:
+            return await user_service.get_by_id(int(user_id))
+
+    # Development bypass - only if no credentials provided
     if settings.AUTH_BYPASS:
         # Additional check to ensure we're not in production
         if settings.APP_ENV == "production":
@@ -27,27 +35,18 @@ async def get_current_user_optional(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="AUTH_BYPASS cannot be enabled in production environment"
             )
-        
-        user_service = UserService(db)
+
         # Get or create a development user
-        dev_user = await user_service.get_by_email("dev@localhost")
+        dev_user = await user_service.get_by_email("dev@example.com")
         if not dev_user:
             dev_user = await user_service.create(
-                email="dev@localhost",
+                email="dev@example.com",
                 full_name="Development User",
                 password="devpassword",
             )
         return dev_user
-    
-    if not credentials:
-        return None
-    
-    user_id = verify_token(credentials.credentials)
-    if not user_id:
-        return None
-    
-    user_service = UserService(db)
-    return await user_service.get_by_id(int(user_id))
+
+    return None
 
 
 async def get_current_user(
