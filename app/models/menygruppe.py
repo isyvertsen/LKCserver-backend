@@ -1,0 +1,16 @@
+"""Menu group model (tblmenygruppe)."""
+from sqlalchemy import Column, Integer, Text
+from sqlalchemy.orm import relationship
+
+from app.infrastructure.database.session import Base
+
+
+class Menygruppe(Base):
+    """Menu group table (tblmenygruppe)."""
+    __tablename__ = "tblmenygruppe"
+
+    gruppeid = Column(Integer, primary_key=True, index=True)
+    beskrivelse = Column(Text)
+    
+    # Relationships
+    menyer = relationship("Meny", back_populates="gruppe")
