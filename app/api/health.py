@@ -1,5 +1,6 @@
 """Health check endpoints."""
-from importlib.metadata import version
+import tomllib
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +11,16 @@ from app.infrastructure.database.session import get_db
 router = APIRouter()
 
 # Get version from pyproject.toml
-try:
-    BACKEND_VERSION = version("catering-backend")
-except Exception:
-    BACKEND_VERSION = "unknown"
+def _get_version() -> str:
+    try:
+        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("project", {}).get("version", "unknown")
+    except Exception:
+        return "unknown"
+
+BACKEND_VERSION = _get_version()
 
 
 @router.get("/")
