@@ -67,11 +67,17 @@ class PdfmeGeneratorService:
         c = canvas.Canvas(buffer, pagesize=page_size)
 
         # Parse and render schemas
-        schemas = template_json.get("schemas", [[]])
+        # pdfme v4 format: schemas is an array of objects where each object is a page
+        # Each page object has field names as keys and schema configs as values
+        schemas = template_json.get("schemas", [{}])
         if schemas and len(schemas) > 0:
-            page_schemas = schemas[0]  # First page schemas
-            for schema in page_schemas:
-                self._render_element(c, schema, inputs, height_mm)
+            page_schemas = schemas[0]  # First page schemas (dict)
+            # Iterate over field names and their schema configs
+            for field_name, schema_config in page_schemas.items():
+                if isinstance(schema_config, dict):
+                    # Add the field name to schema for reference
+                    schema_with_name = {**schema_config, "name": field_name}
+                    self._render_element(c, schema_with_name, inputs, height_mm)
 
         c.save()
         buffer.seek(0)
@@ -103,15 +109,17 @@ class PdfmeGeneratorService:
 
         c = canvas.Canvas(buffer, pagesize=page_size)
 
-        schemas = template_json.get("schemas", [[]])
-        page_schemas = schemas[0] if schemas else []
+        schemas = template_json.get("schemas", [{}])
+        page_schemas = schemas[0] if schemas else {}
 
         for i, inputs in enumerate(inputs_list):
             if i > 0:
                 c.showPage()
 
-            for schema in page_schemas:
-                self._render_element(c, schema, inputs, height_mm)
+            for field_name, schema_config in page_schemas.items():
+                if isinstance(schema_config, dict):
+                    schema_with_name = {**schema_config, "name": field_name}
+                    self._render_element(c, schema_with_name, inputs, height_mm)
 
         c.save()
         buffer.seek(0)
@@ -189,6 +197,56 @@ class PdfmeGeneratorService:
 
         return segments
 
+    def _wrap_text_with_rich(
+        self,
+        c: canvas.Canvas,
+        text: str,
+        width: float,
+        font_size: float,
+        get_font_name: callable
+    ) -> List[List[Tuple[str, bool]]]:
+        """
+        Wrap text with <b> tags to fit within width.
+        Returns list of lines, where each line is a list of (text, is_bold) segments.
+        """
+        segments = self._parse_rich_text(text)
+        lines = []
+        current_line = []
+        current_width = 0
+
+        for segment_text, is_bold in segments:
+            font_name = get_font_name(is_bold, False)
+            words = segment_text.split(' ')
+
+            for i, word in enumerate(words):
+                # Add space before word if not first word in segment or line
+                if i > 0 or (current_line and current_line[-1][0] and not current_line[-1][0].endswith(' ')):
+                    word_with_space = ' ' + word
+                else:
+                    word_with_space = word
+
+                word_width = c.stringWidth(word_with_space, font_name, font_size)
+
+                if current_width + word_width <= width or not current_line:
+                    # Word fits on current line
+                    if current_line and current_line[-1][1] == is_bold:
+                        # Merge with previous segment of same style
+                        current_line[-1] = (current_line[-1][0] + word_with_space, is_bold)
+                    else:
+                        current_line.append((word_with_space, is_bold))
+                    current_width += word_width
+                else:
+                    # Start new line
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = [(word, is_bold)]
+                    current_width = c.stringWidth(word, font_name, font_size)
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
     def _render_text(
         self,
         c: canvas.Canvas,
@@ -199,7 +257,7 @@ class PdfmeGeneratorService:
         height: float,
         value: str
     ):
-        """Render text element with styling, supporting inline <b> tags for bold."""
+        """Render text element with styling, supporting inline <b> tags for bold and word wrap."""
         if not value:
             return
 
@@ -232,41 +290,45 @@ class PdfmeGeneratorService:
 
         # Calculate text position based on alignment
         text_y = y - font_size  # Adjust for text baseline
-
-        # Handle multiline
-        lines = value.split("\n")
-        current_y = text_y
         line_height = font_size * 1.2
 
-        for line in lines:
-            if current_y < 0:
+        # Handle explicit newlines first, then wrap each paragraph
+        paragraphs = value.split("\n")
+        current_y = text_y
+
+        for paragraph in paragraphs:
+            if current_y < (y - height):
                 break
 
-            # Parse line for bold tags
-            segments = self._parse_rich_text(line)
+            # Wrap this paragraph
+            wrapped_lines = self._wrap_text_with_rich(c, paragraph, width, font_size, get_font_name)
 
-            # Calculate total width for alignment
-            total_width = 0
-            for text, is_bold in segments:
-                font_name = get_font_name(is_bold, False)
-                total_width += c.stringWidth(text, font_name, font_size)
+            for line_segments in wrapped_lines:
+                if current_y < (y - height):
+                    break
 
-            # Determine starting x position
-            if alignment == "center":
-                text_x = x + (width - total_width) / 2
-            elif alignment == "right":
-                text_x = x + width - total_width
-            else:
-                text_x = x
+                # Calculate total width for alignment
+                total_width = 0
+                for text, is_bold in line_segments:
+                    font_name = get_font_name(is_bold, False)
+                    total_width += c.stringWidth(text, font_name, font_size)
 
-            # Render each segment
-            for text, is_bold in segments:
-                font_name = get_font_name(is_bold, False)
-                c.setFont(font_name, font_size)
-                c.drawString(text_x, current_y, text)
-                text_x += c.stringWidth(text, font_name, font_size)
+                # Determine starting x position
+                if alignment == "center":
+                    text_x = x + (width - total_width) / 2
+                elif alignment == "right":
+                    text_x = x + width - total_width
+                else:
+                    text_x = x
 
-            current_y -= line_height
+                # Render each segment
+                for text, is_bold in line_segments:
+                    font_name = get_font_name(is_bold, False)
+                    c.setFont(font_name, font_size)
+                    c.drawString(text_x, current_y, text)
+                    text_x += c.stringWidth(text, font_name, font_size)
+
+                current_y -= line_height
 
     def _render_barcode(
         self,
@@ -476,8 +538,9 @@ class PdfmeGeneratorService:
     ):
         """Render a rectangle."""
         border_color = schema.get("borderColor", "#000000")
-        fill_color = schema.get("backgroundColor", None)
-        stroke_width = schema.get("strokeWidth", 1)
+        fill_color = schema.get("color", None)  # pdfme uses "color" for fill
+        # pdfme uses "borderWidth", fallback to "strokeWidth"
+        stroke_width = schema.get("borderWidth", schema.get("strokeWidth", 1))
 
         c.setLineWidth(stroke_width)
 
