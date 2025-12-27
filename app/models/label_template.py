@@ -24,6 +24,7 @@ class LabelTemplate(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     is_global = Column(Boolean, default=False)
     thumbnail_url = Column(String(500))
+    printer_config = Column(JSONB)  # Zebra printer settings (darkness, speed, etc.)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 

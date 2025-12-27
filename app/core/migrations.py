@@ -437,6 +437,7 @@ def get_migration_runner(engine: AsyncEngine) -> MigrationRunner:
         migration_runner.add_migration(AddPreparationInstructionsToCombinedDishes())
         migration_runner.add_migration(CreatePreparationInstructionsTable())
         migration_runner.add_migration(CreateLabelTemplateTables())
+        migration_runner.add_migration(AddPrinterConfigToLabelTemplates())
     return migration_runner
 
 
@@ -629,6 +630,24 @@ class CreateLabelTemplateTables(Migration):
             """))
             await conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_print_history_printed_at ON print_history(printed_at)
+            """))
+
+
+class AddPrinterConfigToLabelTemplates(Migration):
+    """Add printer_config JSONB column to label_templates table."""
+
+    def __init__(self):
+        super().__init__(
+            version="20251227_001_printer_config",
+            description="Add printer_config JSONB column to label_templates for Zebra printer settings"
+        )
+
+    async def up(self, engine: AsyncEngine):
+        async with engine.begin() as conn:
+            # Add printer_config column
+            await conn.execute(text("""
+                ALTER TABLE label_templates
+                ADD COLUMN IF NOT EXISTS printer_config JSONB
             """))
 
 

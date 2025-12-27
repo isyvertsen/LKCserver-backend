@@ -23,6 +23,13 @@ class SourceType(str, Enum):
     API = "api"
 
 
+# Printer Configuration Schema
+class PrinterConfig(BaseSchema):
+    """Zebra printer configuration settings."""
+    darkness: Optional[int] = 15  # 0-30 (ZPL: ~SD)
+    speed: Optional[int] = 4  # 2-14 inches per second (ZPL: ^PR)
+
+
 # Template Parameter Schemas
 class TemplateParameterBase(BaseSchema):
     """Base template parameter schema."""
@@ -70,6 +77,7 @@ class LabelTemplateBase(BaseSchema):
     width_mm: float = 100.0
     height_mm: float = 50.0
     is_global: bool = False
+    printer_config: Optional[PrinterConfig] = None
 
 
 class LabelTemplateCreate(LabelTemplateBase):
@@ -85,6 +93,7 @@ class LabelTemplateUpdate(BaseSchema):
     width_mm: Optional[float] = None
     height_mm: Optional[float] = None
     is_global: Optional[bool] = None
+    printer_config: Optional[PrinterConfig] = None
     parameters: Optional[List[TemplateParameterCreate]] = None
 
 
