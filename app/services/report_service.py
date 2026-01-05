@@ -4,8 +4,15 @@ from typing import Dict, Any
 from io import BytesIO
 import openpyxl
 from docxtpl import DocxTemplate
-from weasyprint import HTML
 from jinja2 import Environment, FileSystemLoader
+
+# Lazy import for WeasyPrint to avoid startup failures if system libraries are missing
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except (OSError, ImportError) as e:
+    WEASYPRINT_AVAILABLE = False
+    WEASYPRINT_ERROR = str(e)
 
 
 class ReportService:
@@ -64,6 +71,12 @@ class ReportService:
         Returns:
             PDF file as bytes
         """
+        if not WEASYPRINT_AVAILABLE:
+            raise RuntimeError(
+                f"WeasyPrint is not available. Error: {WEASYPRINT_ERROR}. "
+                "Please ensure system libraries (libgobject, pango, cairo, gdk-pixbuf) are installed."
+            )
+
         # Render HTML template
         template = self.jinja_env.get_template(template_name)
         html_content = template.render(**data)
