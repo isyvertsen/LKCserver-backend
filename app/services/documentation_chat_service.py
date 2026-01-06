@@ -4,108 +4,209 @@ import openai
 from app.core.config import settings
 
 
-# Documentation content (mirrored from frontend)
-FRONTEND_DOCS = """# Frontend Dokumentasjon
+# User documentation content - focused on how to use the system
+USER_DOCS = """# Brukerveiledning for LKC-systemet
 
-## Oversikt
-Dette er dokumentasjonssystemet for Larvik Catering frontend-applikasjonen.
+## Kom i gang
 
-## Arkitektur
+### Innlogging
+1. Gå til systemets nettside
+2. Klikk "Logg inn med Google" eller skriv inn e-post og passord
+3. Første gang må en administrator godkjenne kontoen din
 
-### Teknologistakk
-- **Next.js 15**: React-rammeverk med App Router
-- **TypeScript**: Type-sikkerhet
-- **NextAuth**: Autentisering
-- **Tailwind CSS**: Styling
-- **Radix UI**: UI-komponenter
+## Navigering
+Menyen ligger på venstre side og inneholder:
+- **Hjem**: Oversikt og dashboard
+- **Kunder**: Kundeadministrasjon
+- **Ordrer**: Ordrehåndtering
+- **Menyer**: Ukemenyer og menyplanlegging
+- **Oppskrifter**: Oppskriftsbibliotek
+- **Produkter**: Produktkatalog
+- **Etiketter**: Etikettdesign og utskrift
+- **Rapporter**: Statistikk og rapporter
+- **Innstillinger**: Systeminnstillinger
 
-### Prosjektstruktur
-```
-src/
-├── app/              # Next.js app router sider
-│   ├── admin/        # Admin-sider (krever admin-rettigheter)
-│   ├── api/          # API-ruter (proxy til backend)
-│   └── ...           # Andre sider
-├── components/       # Gjenbrukbare komponenter
-├── lib/              # Utility-funksjoner
-└── auth.ts           # NextAuth-konfigurasjon
-```
-
-## Autentisering
-Autentisering håndteres av NextAuth med to providers:
-1. **Google OAuth**: For Google-kontoer
-2. **Credentials**: For email/passord
-
-Access tokens fornyes automatisk hver 30. minutt.
-
-## API-integrasjon
-All kommunikasjon med backend går gjennom `apiClient` (axios).
-
-## Komponenter
-Radix UI-baserte komponenter i `components/ui/`:
-- Button, Dialog, Tabs, Card, etc.
-- Tailwind CSS for styling
-
-## Testing
-- **Jest**: Unit tests
-- **Playwright**: E2E tests
-"""
-
-BACKEND_DOCS = """# Backend API Dokumentasjon
-
-## Oversikt
-Backend er en FastAPI-applikasjon som håndterer all business logic og database-operasjoner.
-
-## Autentisering
-
-### Endpoints
-- POST /api/auth/login - Login med email og passord
-- POST /api/auth/google - Login med Google OAuth
-- POST /api/auth/refresh - Forny access token
-
-## Admin API
-
-### Brukeradministrasjon
-- GET /api/admin/users - Hent alle brukere (krever admin)
-- PATCH /api/admin/users/{user_id}/activate - Aktiver bruker
-- PATCH /api/admin/users/{user_id}/make-admin - Gi admin-rettigheter
-
-## Feilhåndtering
-
-### HTTP-statuskoder
-- 200: OK
-- 201: Created
-- 400: Bad Request
-- 401: Unauthorized
-- 403: Forbidden
-- 404: Not Found
-- 500: Internal Server Error
-"""
-
-API_DOCS = """# API-funksjonsbeskrivelser
-
-## Ordre-håndtering
-
-### Endpoints
-- POST /api/orders - Opprett ny ordre
-- GET /api/orders/{id} - Hent enkeltordre
-- GET /api/orders - Hent alle ordrer med filtrering
-  - Query params: customer_id, start_date, end_date, status
-
-## Produktstyring
-Produkter registreres med EAN-koder og kan søkes/filtreres.
+---
 
 ## Oppskrifter
-Oppskrifter inneholder ingredienser med beregnede næringsverdier.
-- Næringsverdier beregnes automatisk fra ingrediensene
-- Vises per 100g og per porsjon
 
-## Etikett-design
-1. Velg mal
-2. Konfigurer felter
-3. Koble til datakilde (produkter, oppskrifter, egendefinerte data)
-4. Forhåndsvis
-5. Skriv ut
+### Opprette en ny oppskrift/rett
+1. Klikk på **Oppskrifter** i menyen
+2. Klikk på **"Ny oppskrift"**-knappen øverst til høyre
+3. Fyll inn oppskriftsinformasjon:
+   - **Navn**: Gi retten et beskrivende navn (f.eks. "Kyllinggryte med ris")
+   - **Beskrivelse**: Kort beskrivelse av retten
+   - **Kategori**: Velg kategori (Hovedrett, Dessert, etc.)
+   - **Porsjoner**: Antall porsjoner oppskriften gir
+
+### Legge til ingredienser
+1. I oppskriftsskjemaet, finn seksjonen **"Ingredienser"**
+2. Klikk **"Legg til ingrediens"**
+3. Søk etter produktet i produktkatalogen
+4. Angi mengde og enhet (gram, stk, dl, etc.)
+5. Gjenta for alle ingredienser
+
+### Næringsverdier
+- Næringsverdier beregnes **automatisk** basert på ingrediensene
+- Du kan se næringsverdier per 100g og per porsjon
+- Allergener vises basert på ingrediensenes informasjon
+
+### Lagre oppskriften
+1. Sjekk at all informasjon er korrekt
+2. Klikk **"Lagre"**-knappen
+3. Oppskriften er nå tilgjengelig i oppskriftsbiblioteket
+
+---
+
+## Menyer
+
+### Opprette ukemeny
+1. Klikk på **Menyer** i menyen
+2. Velg **"Ukeplan"** eller **"Ny meny"**
+3. Velg uke og år
+4. Dra oppskrifter inn i ønsket dag, eller klikk for å legge til
+
+### Menyplanlegging
+1. Gå til **Menyer** > **Planlegging**
+2. Velg periode (uke/måned)
+3. Legg til retter fra oppskriftsbiblioteket
+4. Juster porsjoner etter behov
+
+---
+
+## Kunder
+
+### Legge til ny kunde
+1. Klikk på **Kunder** i menyen
+2. Klikk **"Ny kunde"**
+3. Fyll inn kundeinformasjon:
+   - Navn
+   - Adresse
+   - Kontaktperson
+   - Telefon/e-post
+   - Leveringsadresse (hvis annen)
+4. Velg kundegruppe
+5. Klikk **"Lagre"**
+
+### Redigere kunde
+1. Finn kunden i kundelisten
+2. Klikk på kundenavnet eller rediger-ikonet
+3. Gjør endringer
+4. Klikk **"Lagre"**
+
+---
+
+## Ordrer
+
+### Opprette ny ordre
+1. Klikk på **Ordrer** i menyen
+2. Klikk **"Ny ordre"**
+3. Velg kunde fra listen
+4. Velg leveringsdato
+5. Legg til produkter/retter:
+   - Søk eller velg fra listen
+   - Angi antall
+6. Klikk **"Lagre ordre"**
+
+### Se ordrehistorikk
+1. Gå til **Ordrer**
+2. Bruk filtere for å finne ordrer:
+   - Dato
+   - Kunde
+   - Status
+
+---
+
+## Produkter
+
+### Søke etter produkter
+1. Klikk på **Produkter** i menyen
+2. Bruk søkefeltet øverst
+3. Filtrer på kategori om ønskelig
+
+### Legge til nytt produkt
+1. Klikk **"Nytt produkt"**
+2. Fyll inn produktinformasjon:
+   - Navn
+   - EAN-kode (strekkode)
+   - Kategori
+   - Pris
+   - Enhet
+3. Næringsverdier kan hentes automatisk fra Matinfo
+4. Klikk **"Lagre"**
+
+### Matinfo-integrasjon
+- Søk etter produkter i Matinfo-databasen
+- Importer næringsverdier automatisk
+- Gå til **Produkter** > **Matinfo-søk**
+
+---
+
+## Etiketter
+
+### Designe etiketter
+1. Klikk på **Etiketter** i menyen
+2. Velg en eksisterende mal eller lag ny
+3. Bruk designverktøyet til å:
+   - Legge til tekst
+   - Legge til strekkode
+   - Legge til næringsverdier
+   - Justere layout
+
+### Skrive ut etiketter
+1. Velg produktet/oppskriften
+2. Klikk **"Skriv ut etikett"**
+3. Velg printer (Zebra eller vanlig)
+4. Angi antall
+5. Klikk **"Skriv ut"**
+
+---
+
+## Rapporter
+
+### Generere rapporter
+1. Klikk på **Rapporter** i menyen
+2. Velg rapporttype:
+   - Salgsrapport
+   - Produktrapport
+   - Kundestatistikk
+3. Velg periode
+4. Klikk **"Generer"**
+5. Last ned som PDF eller Excel
+
+---
+
+## Innstillinger
+
+### Tilberedelsesinstruksjoner
+- Gå til **Innstillinger** > **Tilberedelsesinstruksjoner**
+- Administrer standardinstruksjoner for retter
+
+### Skrivere
+- Gå til **Innstillinger** > **Skrivere**
+- Konfigurer Zebra-skrivere for etiketter
+
+---
+
+## Tips og triks
+
+### Hurtigtaster
+- **Escape**: Lukk dialog/modal
+- **Enter**: Bekreft handling
+
+### Vanlige spørsmål
+
+**Hvordan endrer jeg en oppskrift?**
+Gå til Oppskrifter, finn oppskriften, klikk på den, og klikk "Rediger".
+
+**Hvordan kopierer jeg en oppskrift?**
+Åpne oppskriften og klikk "Kopier" for å lage en kopi du kan redigere.
+
+**Hvordan sletter jeg en ordre?**
+Åpne ordren og klikk "Slett". Merk: Dette kan ikke angres.
+
+**Hvordan bytter jeg mellom lyst og mørkt tema?**
+Klikk på tema-knappen i sidemenyen (sol/måne-ikon).
 """
 
 
@@ -118,27 +219,21 @@ class DocumentationChatService:
 
     def _get_system_prompt(self) -> str:
         """Build system prompt with documentation context."""
-        return f"""Du er en hjelpsom dokumentasjonsassistent for Larvik Kommune Catering (LKC) systemet.
-Svar alltid på norsk. Vær konsis og presis.
+        return f"""Du er en hjelpsom brukerstøtte-assistent for Larvik Kommune Catering (LKC) systemet.
+Svar alltid på norsk. Vær vennlig, tydelig og hjelpsom.
 
-Bruk informasjonen under til å besvare brukerspørsmål om systemet.
+Du hjelper brukere med å forstå hvordan de bruker systemet i praksis.
+Gi steg-for-steg instruksjoner når det er relevant.
 
---- FRONTEND DOKUMENTASJON ---
-{FRONTEND_DOCS}
-
---- BACKEND DOKUMENTASJON ---
-{BACKEND_DOCS}
-
---- API DOKUMENTASJON ---
-{API_DOCS}
+{USER_DOCS}
 
 REGLER:
-1. Svar kun basert på dokumentasjonen over
-2. Hvis du ikke finner svaret i dokumentasjonen, si det ærlig
-3. Formater svar med markdown for lesbarhet
-4. Hold svar konsise men komplette
-5. Gi konkrete eksempler når det er relevant
-6. Hvis brukeren spør om noe utenfor systemets scope, forklar høflig at du kun kan hjelpe med LKC-systemet"""
+1. Svar basert på brukerdokumentasjonen over
+2. Gi praktiske, steg-for-steg instruksjoner
+3. Bruk enkel og forståelig norsk
+4. Hvis du ikke finner svaret, si det ærlig og foreslå å kontakte support
+5. Formater svar med markdown for lesbarhet
+6. Hold svar konsise men komplette"""
 
     async def chat(
         self,
