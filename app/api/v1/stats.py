@@ -10,6 +10,7 @@ from app.models.produkter import Produkter as ProdukterModel
 from app.models.kalkyle import Kalkyle
 from app.models.meny import Meny
 from app.models.ordrer import Ordrer
+from app.models.ordredetaljer import Ordredetaljer
 from app.models.perioder import Perioder
 from app.domain.entities.user import User
 from pydantic import BaseModel
@@ -60,6 +61,20 @@ class DailySales(BaseModel):
 class SalesHistoryResponse(BaseModel):
     """Sales history response."""
     data: List[DailySales]
+    period_days: int
+
+
+class TopProduct(BaseModel):
+    """Top product info."""
+    produktid: int
+    produktnavn: str
+    total_quantity: float
+    order_count: int
+
+
+class TopProductsResponse(BaseModel):
+    """Top products response."""
+    products: List[TopProduct]
     period_days: int
 
 
@@ -250,5 +265,57 @@ async def get_sales_history(
 
     return SalesHistoryResponse(
         data=data,
+        period_days=days
+    )
+
+
+@router.get("/top-products", response_model=TopProductsResponse)
+async def get_top_products(
+    days: int = 30,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Hent mest solgte produkter for de siste N dagene.
+    Brukes for dashboard-widgets.
+    """
+    today = date.today()
+    start_date = today - timedelta(days=days - 1)
+
+    # Get top products by total quantity ordered
+    result = await db.execute(
+        select(
+            Ordredetaljer.produktid,
+            ProdukterModel.produktnavn,
+            func.sum(Ordredetaljer.antall).label('total_quantity'),
+            func.count(Ordredetaljer.ordreid.distinct()).label('order_count')
+        ).join(
+            ProdukterModel, Ordredetaljer.produktid == ProdukterModel.produktid
+        ).join(
+            Ordrer, Ordredetaljer.ordreid == Ordrer.ordreid
+        ).where(
+            func.date(Ordrer.ordredato) >= start_date
+        ).group_by(
+            Ordredetaljer.produktid,
+            ProdukterModel.produktnavn
+        ).order_by(
+            func.sum(Ordredetaljer.antall).desc()
+        ).limit(limit)
+    )
+    rows = result.all()
+
+    products = [
+        TopProduct(
+            produktid=row.produktid,
+            produktnavn=row.produktnavn or f"Produkt {row.produktid}",
+            total_quantity=float(row.total_quantity or 0),
+            order_count=row.order_count or 0
+        )
+        for row in rows
+    ]
+
+    return TopProductsResponse(
+        products=products,
         period_days=days
     )
