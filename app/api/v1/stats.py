@@ -11,7 +11,7 @@ from app.models.kalkyle import Kalkyle
 from app.models.meny import Meny
 from app.models.ordrer import Ordrer
 from app.models.ordredetaljer import Ordredetaljer
-from app.models.perioder import Perioder
+from app.models.periode import Perioder
 from app.domain.entities.user import User
 from pydantic import BaseModel
 from typing import Optional, List
