@@ -19,10 +19,11 @@ async def get_leverandorer(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     aktiv: Optional[bool] = Query(True, description="Filter by active status"),
+    search: Optional[str] = Query(None, description="Search by name, email, or phone"),
 ) -> List[Leverandorer]:
     """Get all suppliers."""
     query = select(LeverandorerModel)
-    
+
     # Filter by utgatt status (inverted - utgatt=False means active)
     if aktiv is not None:
         if aktiv:
@@ -31,7 +32,19 @@ async def get_leverandorer(
             )
         else:
             query = query.where(LeverandorerModel.utgatt == True)
-    
+
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                LeverandorerModel.leverandornavn.ilike(search_term),
+                LeverandorerModel.e_post.ilike(search_term),
+                LeverandorerModel.telefonnummer.ilike(search_term),
+                LeverandorerModel.poststed.ilike(search_term),
+            )
+        )
+
     query = query.order_by(LeverandorerModel.leverandornavn).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()

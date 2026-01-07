@@ -1,6 +1,6 @@
 """Category API endpoints."""
-from typing import List
-from sqlalchemy import select
+from typing import List, Optional
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -18,9 +18,22 @@ async def get_kategorier(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    search: Optional[str] = Query(None, description="Search by name or description"),
 ) -> List[Kategorier]:
     """Get all categories."""
-    query = select(KategorierModel).order_by(KategorierModel.kategori).offset(skip).limit(limit)
+    query = select(KategorierModel)
+
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                KategorierModel.kategori.ilike(search_term),
+                KategorierModel.beskrivelse.ilike(search_term),
+            )
+        )
+
+    query = query.order_by(KategorierModel.kategori).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
