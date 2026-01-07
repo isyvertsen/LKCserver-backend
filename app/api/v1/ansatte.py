@@ -20,10 +20,11 @@ async def get_ansatte(
     limit: int = Query(100, ge=1, le=1000),
     aktiv: Optional[bool] = Query(True, description="Filter by active status"),
     avdeling: Optional[str] = Query(None, description="Filter by department"),
+    search: Optional[str] = Query(None, description="Search by name, email, or phone"),
 ) -> List[Ansatte]:
     """Get all employees."""
     query = select(AnsatteModel)
-    
+
     # Filter by active status
     if aktiv is not None:
         if aktiv:
@@ -32,11 +33,25 @@ async def get_ansatte(
             )
         else:
             query = query.where(AnsatteModel.sluttet == True)
-    
+
     # Filter by department
     if avdeling:
         query = query.where(AnsatteModel.avdeling == avdeling)
-    
+
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                AnsatteModel.fornavn.ilike(search_term),
+                AnsatteModel.etternavn.ilike(search_term),
+                AnsatteModel.e_postjobb.ilike(search_term),
+                AnsatteModel.tlfprivat.ilike(search_term),
+                AnsatteModel.tittel.ilike(search_term),
+                AnsatteModel.avdeling.ilike(search_term),
+            )
+        )
+
     query = query.order_by(AnsatteModel.etternavn, AnsatteModel.fornavn).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()

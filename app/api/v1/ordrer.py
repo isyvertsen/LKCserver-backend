@@ -231,12 +231,131 @@ async def cancel_ordre(
         select(OrdrerModel).where(OrdrerModel.ordreid == ordre_id)
     )
     ordre = result.scalar_one_or_none()
-    
+
     if not ordre:
         raise HTTPException(status_code=404, detail="Ordre ikke funnet")
-    
+
     ordre.kansellertdato = datetime.now()
     ordre.ordrestatusid = 5  # Cancelled status
     await db.commit()
-    
+
     return {"message": "Ordre kansellert"}
+
+
+@router.post("/{ordre_id}/duplicate", response_model=Ordrer)
+async def duplicate_ordre(
+    ordre_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Ordrer:
+    """Duplicate an existing order with all its details."""
+    # Get original order
+    result = await db.execute(
+        select(OrdrerModel).where(OrdrerModel.ordreid == ordre_id)
+    )
+    original = result.scalar_one_or_none()
+
+    if not original:
+        raise HTTPException(status_code=404, detail="Ordre ikke funnet")
+
+    # Create new order with same data
+    new_ordre = OrdrerModel(
+        kundeid=original.kundeid,
+        kundenavn=original.kundenavn,
+        ordredato=date.today(),
+        leveringsdato=original.leveringsdato,
+        informasjon=f"Kopi av ordre #{original.ordreid}. {original.informasjon or ''}".strip(),
+        betalingsmate=original.betalingsmate,
+        ordrestatusid=1,  # Reset to "Ny" status
+    )
+    db.add(new_ordre)
+    await db.flush()  # Get the new order ID
+
+    # Copy order details
+    details_result = await db.execute(
+        select(OrdredetaljerModel).where(OrdredetaljerModel.ordreid == ordre_id)
+    )
+    original_details = details_result.scalars().all()
+
+    for idx, detail in enumerate(original_details, 1):
+        new_detail = OrdredetaljerModel(
+            ordreid=new_ordre.ordreid,
+            unik=idx,
+            produktid=detail.produktid,
+            antall=detail.antall,
+            pris=detail.pris,
+            rabatt=detail.rabatt,
+            levdato=detail.levdato,
+            ident=detail.ident,
+        )
+        db.add(new_detail)
+
+    await db.commit()
+    await db.refresh(new_ordre)
+    return new_ordre
+
+
+@router.put("/{ordre_id}/status")
+async def update_ordre_status(
+    ordre_id: int,
+    status_id: int = Query(..., description="New status ID (1=Ny, 2=Under behandling, 3=Godkjent, 4=Levert)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Update order status with workflow logic."""
+    result = await db.execute(
+        select(OrdrerModel).where(OrdrerModel.ordreid == ordre_id)
+    )
+    ordre = result.scalar_one_or_none()
+
+    if not ordre:
+        raise HTTPException(status_code=404, detail="Ordre ikke funnet")
+
+    if ordre.kansellertdato:
+        raise HTTPException(status_code=400, detail="Kan ikke endre status på kansellert ordre")
+
+    ordre.ordrestatusid = status_id
+
+    # Set delivered flag if marking as delivered
+    if status_id == 4:
+        ordre.ordrelevert = True
+
+    await db.commit()
+
+    status_names = {1: "Ny", 2: "Under behandling", 3: "Godkjent", 4: "Levert"}
+    return {"message": f"Ordrestatus endret til {status_names.get(status_id, 'Ukjent')}"}
+
+
+@router.post("/batch/status")
+async def batch_update_status(
+    ordre_ids: List[int] = Query(..., description="List of order IDs to update"),
+    status_id: int = Query(..., description="New status ID"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Batch update order status for multiple orders."""
+    result = await db.execute(
+        select(OrdrerModel).where(
+            OrdrerModel.ordreid.in_(ordre_ids),
+            OrdrerModel.kansellertdato.is_(None)  # Only non-cancelled orders
+        )
+    )
+    orders = result.scalars().all()
+
+    if not orders:
+        raise HTTPException(status_code=404, detail="Ingen gyldige ordrer funnet")
+
+    updated_count = 0
+    for ordre in orders:
+        ordre.ordrestatusid = status_id
+        if status_id == 4:
+            ordre.ordrelevert = True
+        updated_count += 1
+
+    await db.commit()
+
+    status_names = {1: "Ny", 2: "Under behandling", 3: "Godkjent", 4: "Levert"}
+    return {
+        "message": f"{updated_count} ordrer oppdatert til status '{status_names.get(status_id, 'Ukjent')}'",
+        "updated_count": updated_count
+    }
