@@ -401,7 +401,13 @@ class MatinfoSyncService:
 
         except Exception as e:
             logger.error(f"Error syncing product {normalized_gtin}: {e}")
-            await self.db.rollback()
+            # Don't call rollback here - let the caller handle session cleanup
+            # or the next operation will start a fresh transaction
+            try:
+                await self.db.rollback()
+            except Exception:
+                # Ignore rollback errors - session may already be in invalid state
+                pass
             return False
 
     async def sync_updated_products(
@@ -431,23 +437,26 @@ class MatinfoSyncService:
         synced = 0
         failed = 0
 
-        # Process in batches to avoid overwhelming the API
-        for i in range(0, len(updated_gtins), batch_size):
-            batch = updated_gtins[i:i + batch_size]
+        # Process products sequentially - AsyncSession shouldn't be shared
+        # across concurrent operations
+        for i, gtin in enumerate(updated_gtins):
+            try:
+                success = await self.sync_product(gtin)
+                if success:
+                    synced += 1
+                else:
+                    failed += 1
+            except Exception as e:
+                logger.error(f"Unexpected error syncing {gtin}: {e}")
+                failed += 1
 
-            # Process batch in parallel
-            tasks = [self.sync_product(gtin) for gtin in batch]
-            results = await asyncio.gather(*tasks)
+            # Log progress every 10 products
+            if (i + 1) % 10 == 0:
+                logger.info(f"Progress: {i + 1}/{len(updated_gtins)}")
 
-            # Count results
-            synced += sum(1 for r in results if r)
-            failed += sum(1 for r in results if not r)
-
-            logger.info(f"Progress: {i + len(batch)}/{len(updated_gtins)}")
-
-            # Small delay between batches to be nice to the API
-            if i + batch_size < len(updated_gtins):
-                await asyncio.sleep(1)
+            # Small delay to be nice to the API
+            if i < len(updated_gtins) - 1:
+                await asyncio.sleep(0.1)
 
         logger.info(f"Sync completed: {synced} synced, {failed} failed")
 
