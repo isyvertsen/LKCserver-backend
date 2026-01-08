@@ -207,7 +207,7 @@ async def get_customer_period_report(
             period_end=periode.tildato,
             menu_group={
                 "gruppeid": menu.gruppe.menygruppeid if menu.gruppe else None,
-                "gruppe": menu.gruppe.gruppe if menu.gruppe else None
+                "gruppe": menu.gruppe.beskrivelse if menu.gruppe else None
             },
             customers=[{
                 "kundeid": k.kundeid,
