@@ -336,10 +336,36 @@ async def delete_periode(
     query = select(Periode).where(Periode.menyperiodeid == periode_id)
     result = await db.execute(query)
     periode = result.scalar_one_or_none()
-    
+
     if not periode:
         raise HTTPException(status_code=404, detail="Period not found")
-    
+
     await db.delete(periode)
     await db.commit()
     return {"message": "Period deleted successfully"}
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_perioder(
+    ids: List[int],
+    db: AsyncSession = Depends(get_db)
+):
+    """Bulk delete periods."""
+    if not ids:
+        raise HTTPException(status_code=400, detail="Ingen IDer oppgitt")
+
+    result = await db.execute(
+        select(Periode).where(Periode.menyperiodeid.in_(ids))
+    )
+    perioder = result.scalars().all()
+
+    if not perioder:
+        raise HTTPException(status_code=404, detail="Ingen perioder funnet")
+
+    count = len(perioder)
+    for periode in perioder:
+        await db.delete(periode)
+
+    await db.commit()
+
+    return {"message": f"{count} perioder slettet"}
